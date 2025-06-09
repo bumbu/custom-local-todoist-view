@@ -1,8 +1,153 @@
 .OptionsContainer {
-  width: 100%;
-  height: 50vh;
-  font-size: 2rem;
-  display: flex;
+  display: block;
   align-items: center;
   justify-content: center;
+  font-family: -apple-system, system-ui, 'Segoe UI', Roboto, Noto, Oxygen-Sans,
+    Ubuntu, Cantrell, 'Helvetica Neue', sans-serif, 'Apple Color Emoji',
+    'Segoe UI Emoji', 'Segoe UI Symbol';
+  padding: 0 55px;
+  position: relative;
+}
+
+.task-list-loading-indicator {
+  position: absolute;
+  top: 9px;
+  left: 10px;
+}
+
+.task-list-actions {
+  position: absolute;
+  top: 0px;
+  left: 10px;
+
+  &__item {
+    border: 0;
+    background: none;
+    display: inline-block;
+    margin-right: 10px;
+
+    &:hover {
+      cursor: pointer;
+    }
+  }
+}
+
+.task-list-container {
+  border-top: 1px solid #eeeeee;
+}
+
+.task-list-title {
+  position: relative;
+  &__action {
+    position: absolute;
+    top: 0;
+    right: 0;
+  }
+}
+
+.task_list_item {
+  border-bottom: 1px solid #eeeeee;
+  position: relative;
+
+  &__content {
+    flex: 1;
+    padding: 8px 0;
+    margin: 0 30px 0 0;
+  }
+
+  &__body {
+    /* margin: 10px; */
+    display: flex;
+    align-items: stretch;
+    position: relative;
+  }
+}
+
+.task_checkbox {
+  align-items: center;
+  display: flex;
+  flex-shrink: 0;
+  justify-content: center;
+  margin: 8px 6px 0 -3px;
+  width: 24px;
+  height: 24px;
+  box-sizing: border-box;
+  user-select: none;
+  background-color: initial;
+  border: none;
+  color: #202020;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 13px;
+  padding: 0;
+  -webkit-text-decoration: none;
+  text-decoration: none;
+  position: relative;
+
+  &__circle {
+    .priority_1 & {
+      background-color: #d1453b;
+    }
+    .priority_2 & {
+      background-color: #eb8909;
+    }
+    .priority_3 & {
+      background-color: #246fe0;
+    }
+
+    // background-color: rgb(36 111 224);
+    border-width: 2px;
+    box-sizing: border-box;
+    border: 1px solid transparent;
+    border-radius: 50%;
+    height: 18px;
+    left: 3px;
+    opacity: 0.1;
+    overflow: hidden;
+    position: absolute;
+    top: 3px;
+    width: 18px;
+    align-items: center;
+    display: flex;
+    flex-shrink: 0;
+    justify-content: center;
+  }
+
+  &__border {
+    .priority_1 & {
+      border-color: #d1453b;
+      border-width: 2px;
+    }
+    .priority_2 & {
+      border-color: #eb8909;
+      border-width: 2px;
+    }
+    .priority_3 & {
+      border-color: #246fe0;
+      border-width: 2px;
+    }
+
+    border: 1px solid rgb(153, 153, 153);
+    box-sizing: border-box;
+    border-radius: 50%;
+    height: 18px;
+    left: 3px;
+    position: absolute;
+    top: 3px;
+    width: 18px;
+  }
+}
+
+.task_content {
+  font-size: 14px;
+  color: #202020;
+  padding-bottom: 2px;
+  line-height: 1.65;
+}
+
+.bars-right {
+  display: inline-block;
+  position: absolute;
+  right: 10px;
+  top: 10px;
 }

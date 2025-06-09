@@ -22,3 +22,5 @@
 
 # secrets
 secrets.*.js
+
+/src/pages/Options/OptionsSettings.ts
