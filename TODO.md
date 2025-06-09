@@ -1,0 +1,6 @@
+- Setup a local proxy for testing https://github.com/Glifery/cors-proxy
+- Setup a lambda proxy
+- Update lambda proxy to have a "secret"
+- Change my script to build a static page
+- Proxy and token should be passed as settings
+- Deploy this static page to Github pages
