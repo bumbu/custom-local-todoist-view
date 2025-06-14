@@ -365,6 +365,7 @@ async function reorderTasks(
       newSiblingBelowIndex = endIndex + 1;
     }
   }
+  console.log({newSiblingAboveIndex, newSiblingBelowIndex})
 
   const newSiblingAboveOrder =
     newSiblingAboveIndex === null
@@ -380,6 +381,7 @@ async function reorderTasks(
     newSiblingBelowIndex,
     newSiblingAboveOrder,
     newSiblingBellowOrder,
+    tasks,
   });
 
   if (newSiblingAboveOrder === null || newSiblingBellowOrder === null) {
@@ -419,6 +421,7 @@ async function reorderTasks(
 function getTaskOrder(task: { content: string }): number | null {
   const match = task.content.match(/^\[([0-9]{1,2})\]/);
   if (match == null) {
+    console.error(`Failed to parse the task order for: ${content}`);
     return null;
   } else {
     const index = match[1];
