@@ -97,11 +97,11 @@ type TodoistTask = TodoistTaskRaw & {
   // implicitOrder: number;
 };
 
+type InsertionType = 'right_after' | 'middle' | 'pushy';
+
 const Options: React.FC<Props> = ({ title }: Props) => {
   const [isLoading, setIsLoading] = useState(true);
-  const [insertionType, setInsertionType] = useState<'right_after' | 'default'>(
-    'right_after'
-  );
+  const [insertionType, setInsertionType] = useState<InsertionType>('pushy');
   const tasksRef = useRef<TodoistTask[]>([]);
   const [tasks, setTasksImpl] = useState<TodoistTask[]>(tasksRef.current);
   // Before updating tasks, we want to keep it in a ref
@@ -190,7 +190,8 @@ const Options: React.FC<Props> = ({ title }: Props) => {
                 value={insertionType}
                 onChange={(e) => setInsertionType(e.target.value)}
               >
-                <option value="default">default</option>
+                <option value="middle">middle</option>
+                <option value="pushy">pushy</option>
                 <option value="right_after">right after</option>
               </select>
             </div>
@@ -355,11 +356,12 @@ async function reorderTasks(
   tasks: TodoistTask[],
   startIndex: number,
   endIndex: number,
-  insertionType: 'default' | 'right_after',
+  insertionType: InsertionType,
   setIsLoading: (isLoading: boolean) => void,
   setTasks: (tasks: TodoistTask[]) => void
 ) {
-  if (insertionType === 'default') {
+  if (insertionType === 'middle') {
+    // Will place this task in the middle of sibling tasks
     return reorderTasksDefault(
       tasks,
       startIndex,
@@ -368,7 +370,17 @@ async function reorderTasks(
       setTasks
     );
   } else if (insertionType === 'right_after') {
+    // This will place this task right after the target task
     return reorderTasksRightAfter(
+      tasks,
+      startIndex,
+      endIndex,
+      setIsLoading,
+      setTasks
+    );
+  } else if (insertionType === 'pushy') {
+    // This will place this task right after the target task, and push all other ones down
+    return reorderTasksPushy(
       tasks,
       startIndex,
       endIndex,
@@ -516,6 +528,102 @@ async function reorderTasksRightAfter(
   const updatedTask = await updateTask(removed, { content: removed.content });
   reorderedTasks[endIndex] = updatedTask;
   setTasks([...reorderedTasks]);
+  setIsLoading(false);
+}
+
+async function reorderTasksPushy(
+  tasks: TodoistTask[],
+  startIndex: number,
+  endIndex: number,
+  setIsLoading: (isLoading: boolean) => void,
+  setTasks: (tasks: TodoistTask[]) => void
+) {
+  if (startIndex === endIndex) return;
+  setIsLoading(true);
+
+  const isMovedUp = startIndex > endIndex;
+  let newSiblingAboveIndex: number = 0;
+  if (isMovedUp) {
+    if (endIndex === 0) {
+      // We took the first spot
+      newSiblingAboveIndex = -1;
+    } else {
+      newSiblingAboveIndex = endIndex - 1;
+    }
+  } else {
+    if (endIndex === tasks.length - 1) {
+      // We took the last spot
+      newSiblingAboveIndex = tasks.length - 1;
+    } else {
+      newSiblingAboveIndex = endIndex;
+    }
+  }
+  console.log({ newSiblingAboveIndex });
+
+  // Get the order of target task
+  const targetTaskOrder =
+    newSiblingAboveIndex >= 0 ? getTaskOrder(tasks[newSiblingAboveIndex]) : 0;
+
+  if (targetTaskOrder === null) {
+    throw new Error(
+      'Error in calculating target task order, probably missing order'
+    );
+  }
+
+  // Place task in new position
+  const reorderedTasks = [...tasks];
+  const [removed] = reorderedTasks.splice(startIndex, 1);
+  reorderedTasks.splice(endIndex, 0, removed);
+
+  let currentIndex = endIndex;
+  let currentTaskOrder = targetTaskOrder + 1;
+  const tasksToPersist: Array<{ task: TodoistTaskRaw; index: number }> = [];
+  // iterate over tasks, if order is less than currentTaskOrder, then increment
+  while (currentIndex < reorderedTasks.length) {
+    const task = reorderedTasks[currentIndex];
+    const taskOrder = getTaskOrder(task);
+    if (taskOrder === null) {
+      console.log('Failed on getting task order:', task);
+      throw new Error(
+        'Error in calculating task order, probably missing order'
+      );
+    }
+    console.log(task);
+    if (task.priority >= 4) {
+      // p4 are boundary tasks
+      console.log('Stop at p4 task:', task);
+      break;
+    }
+
+    if (taskOrder <= currentTaskOrder) {
+      updateTaskImplicitOrder(task, currentTaskOrder);
+      tasksToPersist.push({ task, index: currentIndex });
+      currentIndex += 1;
+      currentTaskOrder += 1;
+    } else {
+      // No need to continue, we are done
+      break;
+    }
+  }
+
+  // Update task content
+  // updateTaskImplicitOrder(removed, targetTaskOrder + 1);
+
+  // Flush
+  setTasks(reorderedTasks);
+
+  await Promise.all(
+    tasksToPersist.map(async ({ task, index }) => {
+      const updatedTask = await updateTask(task, { content: task.content });
+      reorderedTasks[index] = updatedTask;
+    })
+  );
+  setTasks([...reorderedTasks]);
+
+  // Update on server
+  // const updatedTask = await updateTask(removed, { content: removed.content });
+  // reorderedTasks[endIndex] = updatedTask;
+  // setTasks([...reorderedTasks]);
   setIsLoading(false);
 }
 
