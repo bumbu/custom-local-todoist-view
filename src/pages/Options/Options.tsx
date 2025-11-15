@@ -578,36 +578,70 @@ async function reorderTasksPushy(
   let currentIndex = endIndex;
   let currentTaskOrder = targetTaskOrder + 1;
   const tasksToPersist: Array<{ task: TodoistTaskRaw; index: number }> = [];
-  // iterate over tasks, if order is less than currentTaskOrder, then increment
-  while (currentIndex < reorderedTasks.length) {
-    const task = reorderedTasks[currentIndex];
-    const taskOrder = getTaskOrder(task);
-    if (taskOrder === null) {
-      console.log('Failed on getting task order:', task);
-      throw new Error(
-        'Error in calculating task order, probably missing order'
-      );
-    }
-    console.log(task);
-    if (task.priority >= 4) {
-      // p4 are boundary tasks
-      console.log('Stop at p4 task:', task);
-      break;
-    }
 
-    if (taskOrder <= currentTaskOrder) {
-      updateTaskImplicitOrder(task, currentTaskOrder);
-      tasksToPersist.push({ task, index: currentIndex });
-      currentIndex += 1;
-      currentTaskOrder += 1;
-    } else {
-      // No need to continue, we are done
+  // Find max allowed order by scanning forward until p4 task is found. Set 99 otherwise
+  let maxAllowedOrder = MAX_TASK_ORDER;
+  for (let i = currentIndex; i < reorderedTasks.length; i++) {
+    const task = reorderedTasks[i];
+    if (task.priority >= 4) {
+      // p4 found
+      const taskOrder = getTaskOrder(task);
+      if (taskOrder == null) {
+        console.log('Failed on getting task order:', task);
+        throw new Error(
+          'Error in calculating task order, probably missing order'
+        );
+      }
+      maxAllowedOrder = taskOrder - 1;
       break;
     }
   }
+  console.log('Max allowed order:', maxAllowedOrder);
 
-  // Update task content
-  // updateTaskImplicitOrder(removed, targetTaskOrder + 1);
+  // When dropped, set task priority to target + 1, but no more than maxAllowedOrder
+  // Also check next task to make sure that its order is not less than current task order, update otherwise in a similar fashion
+  while (currentIndex < reorderedTasks.length) {
+    const task = reorderedTasks[currentIndex];
+    const taskOrder = getxTaskOrder(task);
+
+    if (currentTaskOrder > maxAllowedOrder) {
+      console.log('Reached max allowed order:', taskOrder, task);
+      break;
+    }
+
+    // Updating
+    updateTaskImplicitOrder(task, currentTaskOrder);
+    tasksToPersist.push({ task, index: currentIndex });
+
+    // Check what next task is about to know if we need to continue
+    console.log('Pre:', { currentIndex, rl: reorderedTasks.length });
+    if (currentIndex < reorderedTasks.length - 1) {
+      const nextTask = reorderedTasks[currentIndex + 1];
+      if (nextTask.priority >= 4) {
+        // p4 are boundary tasks
+        console.log('Next task is p4, stop here:', nextTask);
+        break;
+      }
+      const nextTaskOrder = getxTaskOrder(nextTask);
+      console.log('Next task is', {
+        nextTask,
+        nextTaskOrder,
+      });
+      if (nextTaskOrder > currentTaskOrder) {
+        // No need to continue, we are done
+        break;
+      }
+    }
+    console.log('Continuing to next task', {
+      task,
+      taskOrder,
+      currentIndex,
+      currentTaskOrder,
+    });
+
+    currentIndex += 1;
+    currentTaskOrder += 1;
+  }
 
   // Flush
   setTasks(reorderedTasks);
@@ -618,12 +652,8 @@ async function reorderTasksPushy(
       reorderedTasks[index] = updatedTask;
     })
   );
+  // Flush after server update
   setTasks([...reorderedTasks]);
-
-  // Update on server
-  // const updatedTask = await updateTask(removed, { content: removed.content });
-  // reorderedTasks[endIndex] = updatedTask;
-  // setTasks([...reorderedTasks]);
   setIsLoading(false);
 }
 
@@ -641,6 +671,16 @@ function getTaskOrder(task: { content: string }): number | null {
     } else {
       return implicitOrder;
     }
+  }
+}
+
+function getxTaskOrder(task: { content: string }): number {
+  const order = getTaskOrder(task);
+  if (order == null) {
+    console.log('Task is missing implicit order:', task);
+    throw new Error('Task is missing implicit order');
+  } else {
+    return order;
   }
 }
 
