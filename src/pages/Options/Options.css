@@ -38,10 +38,21 @@
 
 .task-list-title {
   position: relative;
-  &__action {
+  &__actions {
     position: absolute;
     top: 0;
     right: 0;
+    display: flex;
+  }
+  &__action {
+    margin-left: 10px;
+  }
+
+  &__selector {
+    // position: absolute;
+    // right: 0;
+    // top: 0;
+    // margin-right: 10px;
   }
 }
 

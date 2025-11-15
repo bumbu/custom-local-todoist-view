@@ -16,7 +16,7 @@ import {
   faSpinner,
   faCompass,
 } from '@fortawesome/free-solid-svg-icons';
-import { TODOIST_TOKEN } from './OptionsSettings'
+import { TODOIST_TOKEN } from './OptionsSettings';
 
 library.add(faCheck, faRedoAlt, faWindowClose, faBars, faSpinner, faCompass);
 
@@ -99,6 +99,9 @@ type TodoistTask = TodoistTaskRaw & {
 
 const Options: React.FC<Props> = ({ title }: Props) => {
   const [isLoading, setIsLoading] = useState(true);
+  const [insertionType, setInsertionType] = useState<'right_after' | 'default'>(
+    'right_after'
+  );
   const tasksRef = useRef<TodoistTask[]>([]);
   const [tasks, setTasksImpl] = useState<TodoistTask[]>(tasksRef.current);
   // Before updating tasks, we want to keep it in a ref
@@ -136,6 +139,7 @@ const Options: React.FC<Props> = ({ title }: Props) => {
       tasks,
       result.source.index,
       result.destination.index,
+      insertionType,
       setIsLoading,
       setTasks
     );
@@ -178,11 +182,27 @@ const Options: React.FC<Props> = ({ title }: Props) => {
       {tasks.length > 0 && (
         <div className="task-list-title">
           <h2>{FILTER}</h2>
-          {!isLoading && (
-            <button className="task-list-title__action" onClick={onClickSpread}>
-              Spread
-            </button>
-          )}
+          <div className="task-list-title__actions">
+            <div className="task-list-title__selector">
+              <select
+                name="insertion_type"
+                id="insertion_type"
+                value={insertionType}
+                onChange={(e) => setInsertionType(e.target.value)}
+              >
+                <option value="default">default</option>
+                <option value="right_after">right after</option>
+              </select>
+            </div>
+            {!isLoading && (
+              <button
+                className="task-list-title__action"
+                onClick={onClickSpread}
+              >
+                Spread
+              </button>
+            )}
+          </div>
         </div>
       )}
 
@@ -335,6 +355,34 @@ async function reorderTasks(
   tasks: TodoistTask[],
   startIndex: number,
   endIndex: number,
+  insertionType: 'default' | 'right_after',
+  setIsLoading: (isLoading: boolean) => void,
+  setTasks: (tasks: TodoistTask[]) => void
+) {
+  if (insertionType === 'default') {
+    return reorderTasksDefault(
+      tasks,
+      startIndex,
+      endIndex,
+      setIsLoading,
+      setTasks
+    );
+  } else if (insertionType === 'right_after') {
+    return reorderTasksRightAfter(
+      tasks,
+      startIndex,
+      endIndex,
+      setIsLoading,
+      setTasks
+    );
+  }
+}
+
+// a little function to help us with reordering the result
+async function reorderTasksDefault(
+  tasks: TodoistTask[],
+  startIndex: number,
+  endIndex: number,
   setIsLoading: (isLoading: boolean) => void,
   setTasks: (tasks: TodoistTask[]) => void
 ) {
@@ -365,7 +413,7 @@ async function reorderTasks(
       newSiblingBelowIndex = endIndex + 1;
     }
   }
-  console.log({newSiblingAboveIndex, newSiblingBelowIndex})
+  console.log({ newSiblingAboveIndex, newSiblingBelowIndex });
 
   const newSiblingAboveOrder =
     newSiblingAboveIndex === null
@@ -418,10 +466,63 @@ async function reorderTasks(
   setIsLoading(false);
 }
 
+async function reorderTasksRightAfter(
+  tasks: TodoistTask[],
+  startIndex: number,
+  endIndex: number,
+  setIsLoading: (isLoading: boolean) => void,
+  setTasks: (tasks: TodoistTask[]) => void
+) {
+  if (startIndex === endIndex) return;
+  setIsLoading(true);
+
+  const isMovedUp = startIndex > endIndex;
+  let newSiblingAboveIndex: number = 0;
+  if (isMovedUp) {
+    if (endIndex === 0) {
+      // We took the first spot
+      newSiblingAboveIndex = -1;
+    } else {
+      newSiblingAboveIndex = endIndex - 1;
+    }
+  } else {
+    if (endIndex === tasks.length - 1) {
+      // We took the last spot
+      newSiblingAboveIndex = tasks.length - 1;
+    } else {
+      newSiblingAboveIndex = endIndex;
+    }
+  }
+  console.log({ newSiblingAboveIndex });
+
+  // Get the order of target task
+  const targetTaskOrder =
+    newSiblingAboveIndex >= 0 ? getTaskOrder(tasks[newSiblingAboveIndex]) : 0;
+
+  if (targetTaskOrder === null) {
+    throw new Error(
+      'Error in calculating target task order, probably missing order'
+    );
+  }
+
+  // Optimistic update
+  const reorderedTasks = [...tasks];
+  const [removed] = reorderedTasks.splice(startIndex, 1);
+  updateTaskImplicitOrder(removed, targetTaskOrder + 1);
+  reorderedTasks.splice(endIndex, 0, removed);
+  setTasks(reorderedTasks);
+
+  // Update on server
+  const updatedTask = await updateTask(removed, { content: removed.content });
+  reorderedTasks[endIndex] = updatedTask;
+  setTasks([...reorderedTasks]);
+  setIsLoading(false);
+}
+
 function getTaskOrder(task: { content: string }): number | null {
   const match = task.content.match(/^\[([0-9]{1,2})\]/);
   if (match == null) {
-    console.error(`Failed to parse the task order for: ${content}`);
+    console.error(`Failed to parse the task order for: ${task.content}`);
     return null;
   } else {
     const index = match[1];
