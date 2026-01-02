@@ -53,9 +53,22 @@ const Task = ({ task }: { task: TodoistTask }) => {
   );
 };
 
+const QUESTIONS = {
+  is_it_completed: 'Is it completed?',
+  action_on_it: 'Action on it now?',
+  should_delete: 'Should it be deleted?',
+  confirm_time_horizon: 'Confirm time horizon',
+  break_it: 'Break it down?',
+  defer_it: 'Defer it',
+};
+
+const QUESTION_KEYS = Object.keys(QUESTIONS) as (keyof typeof QUESTIONS)[];
+
 const OptionsCards: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [tasks, setTasks] = useState<TodoistTask[]>([]);
+  const [question, setQuestion] =
+    useState<keyof typeof QUESTIONS>('is_it_completed');
 
   useEffect(() => {
     getTasks({ filter: FILTER }).then((tasks) => {
@@ -66,6 +79,12 @@ const OptionsCards: React.FC = () => {
 
   const relevantTasks = tasks.filter((task) => task.priority <= 3); // Only p3 and higher
   const nextTask = relevantTasks.length > 0 ? relevantTasks[0] : null;
+
+  const handleNextQuestion = () => {
+    const currentIndex = QUESTION_KEYS.indexOf(question);
+    const nextIndex = (currentIndex + 1) % QUESTION_KEYS.length;
+    setQuestion(QUESTION_KEYS[nextIndex]);
+  };
 
   const handleComplete = async () => {
     if (!nextTask) return;
@@ -78,6 +97,7 @@ const OptionsCards: React.FC = () => {
       alert('Failed to complete task');
     } finally {
       setIsLoading(false);
+      setQuestion('is_it_completed');
     }
   };
 
@@ -92,6 +112,7 @@ const OptionsCards: React.FC = () => {
       alert('Failed to delete task');
     } finally {
       setIsLoading(false);
+      setQuestion('is_it_completed');
     }
   };
 
@@ -113,12 +134,17 @@ const OptionsCards: React.FC = () => {
             <Task task={nextTask} />
           </div>
           <div className="task_list_buttons">
-            {/* <button>I'll take it</button> */}
-            <button onClick={handleComplete}>✅ Complete</button>
-            <button onClick={handleDelete}>🗑️ Delete</button>
-            <button>🚠 Select time horizon</button>
-            <button>⤵️ I'll break it</button>
-            <button>📍Defer it</button>
+            <p className="task_list_buttons__question">{QUESTIONS[question]}</p>
+            <button onClick={handleNextQuestion}>no</button>
+            {question === 'is_it_completed' && (
+              <button onClick={handleComplete}>✅ Yes, close it</button>
+            )}
+            {question === 'action_on_it' && (
+              <button onClick={handleComplete}>✅ Task completed</button>
+            )}
+            {question === 'should_delete' && (
+              <button onClick={handleDelete}>🗑️ Delete it</button>
+            )}
           </div>
         </>
       )}

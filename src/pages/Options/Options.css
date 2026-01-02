@@ -77,8 +77,16 @@
 .task_list_buttons {
   margin: 10px 0;
 
+  &__question {
+    display: block;
+    margin-right: 15px;
+    font-weight: 500;
+    font-size: 18px;
+  }
+
   button {
     margin: 0 5px 0 0;
+    font-size: 14px;
   }
 }
 
