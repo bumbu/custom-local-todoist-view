@@ -74,6 +74,14 @@
   }
 }
 
+.task_list_buttons {
+  margin: 10px 0;
+
+  button {
+    margin: 0 5px 0 0;
+  }
+}
+
 .task_checkbox {
   align-items: center;
   display: flex;
