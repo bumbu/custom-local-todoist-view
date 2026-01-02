@@ -56,7 +56,6 @@ const Task = ({ task }: { task: TodoistTask }) => {
 const OptionsCards: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [tasks, setTasks] = useState<TodoistTask[]>([]);
-  const [history, setHistory] = useState<string[]>([]);
 
   useEffect(() => {
     getTasks({ filter: FILTER }).then((tasks) => {
@@ -75,16 +74,22 @@ const OptionsCards: React.FC = () => {
       await completeTask(nextTask.id);
       const updatedTasks = await getTasks({ filter: FILTER });
       setTasks(updatedTasks);
-      setHistory((prevHistory) => [
-        `Completed: ${nextTask.content}`,
-        ...prevHistory,
-      ]);
     } catch (error) {
-      setHistory((prevHistory) => [
-        `Failed to complete: ${nextTask.content}`,
-        ...prevHistory,
-      ]);
       alert('Failed to complete task');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!nextTask) return;
+    setIsLoading(true);
+    try {
+      await deleteTask(nextTask.id);
+      const updatedTasks = await getTasks({ filter: FILTER });
+      setTasks(updatedTasks);
+    } catch (error) {
+      alert('Failed to delete task');
     } finally {
       setIsLoading(false);
     }
@@ -108,9 +113,9 @@ const OptionsCards: React.FC = () => {
             <Task task={nextTask} />
           </div>
           <div className="task_list_buttons">
-            <button>I'll take it</button>
+            {/* <button>I'll take it</button> */}
             <button onClick={handleComplete}>✅ Complete</button>
-            <button>🗑️ Delete</button>
+            <button onClick={handleDelete}>🗑️ Delete</button>
             <button>🚠 Select time horizon</button>
             <button>⤵️ I'll break it</button>
             <button>📍Defer it</button>
@@ -118,11 +123,6 @@ const OptionsCards: React.FC = () => {
         </>
       )}
       {!isLoading && nextTask === null && <p>No tasks found.</p>}
-      {/* <ol className="task_list_history">
-        {history.map((entry, index) => (
-          <li key={index}>{entry}</li>
-        ))}
-      </ol> */}
     </div>
   );
 };
@@ -140,6 +140,22 @@ async function completeTask(taskId: string): Promise<void> {
 
   if (!response.ok) {
     throw new Error('Failed to complete task');
+  }
+}
+
+async function deleteTask(taskId: string): Promise<void> {
+  const response = await fetch(
+    `https://api.todoist.com/rest/v2/tasks/${taskId}`,
+    {
+      method: 'DELETE',
+      headers: {
+        Authorization: `Bearer ${TODOIST_TOKEN}`,
+      },
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error('Failed to delete task');
   }
 }
 
