@@ -78,12 +78,58 @@ const OptionsCards: React.FC = () => {
   }, []);
 
   const relevantTasks = tasks.filter((task) => task.priority <= 3); // Only p3 and higher
+  const horizons = tasks
+    .filter((task) => task.priority === 4)
+    .sort((a, b) => {
+      const aNum = extractNumber(a.content) || 0;
+      const bNum = extractNumber(b.content) || 0;
+      return aNum - bNum;
+    });
   const nextTask = relevantTasks.length > 0 ? relevantTasks[0] : null;
 
   const handleNextQuestion = () => {
     const currentIndex = QUESTION_KEYS.indexOf(question);
     const nextIndex = (currentIndex + 1) % QUESTION_KEYS.length;
     setQuestion(QUESTION_KEYS[nextIndex]);
+  };
+
+  const handleHorizonClick = async (horizonIndex: number) => {
+    if (!nextTask) return;
+
+    const selectedHorizon = horizons[horizonIndex];
+    const nextHorizon = horizons[horizonIndex + 1];
+
+    const horizonStart = extractNumber(selectedHorizon.content) || 0;
+    const horizonEnd = nextHorizon
+      ? (extractNumber(nextHorizon.content) || 100) - 1
+      : 99;
+
+    const taskNum = extractNumber(nextTask.content);
+
+    if (taskNum !== null && taskNum >= horizonStart && taskNum <= horizonEnd) {
+      handleNextQuestion();
+    } else {
+      setIsLoading(true);
+      try {
+        const newTitle = nextTask.content.replace(
+          /^\[\d+\]/,
+          `[${horizonEnd.toString().padStart(2, '0')}]`
+        );
+        // If no [XX] prefix, add it
+        const finalTitle = /^\[\d+\]/.test(nextTask.content)
+          ? newTitle
+          : `[${horizonEnd.toString().padStart(2, '0')}] ${nextTask.content}`;
+
+        await updateTaskTitle(nextTask.id, finalTitle);
+        const updatedTasks = await getTasks({ filter: FILTER });
+        setTasks(updatedTasks);
+      } catch (error) {
+        alert('Failed to update task title');
+      } finally {
+        setIsLoading(false);
+        handleNextQuestion();
+      }
+    }
   };
 
   const handleComplete = async () => {
@@ -145,6 +191,18 @@ const OptionsCards: React.FC = () => {
             {question === 'should_delete' && (
               <button onClick={handleDelete}>🗑️ Delete it</button>
             )}
+            {question === 'confirm_time_horizon' && (
+              <div className="time_horizons">
+                {horizons.map((horizon, index) => (
+                  <button
+                    key={horizon.id}
+                    onClick={() => handleHorizonClick(index)}
+                  >
+                    {horizon.content}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </>
       )}
@@ -185,6 +243,24 @@ async function deleteTask(taskId: string): Promise<void> {
   }
 }
 
+async function updateTaskTitle(taskId: string, title: string): Promise<void> {
+  const response = await fetch(
+    `https://api.todoist.com/rest/v2/tasks/${taskId}`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${TODOIST_TOKEN}`,
+      },
+      body: JSON.stringify({ content: title }),
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error('Failed to update task title');
+  }
+}
+
 async function getTasks({
   filter,
 }: {
@@ -207,9 +283,9 @@ async function getTasks({
 
   const rawTasks: TodoistTaskRaw[] = await response.json();
   const normalizedTasks = normalizeTasks(rawTasks);
-  const sortedAndNormalizedTasks = normalizedTasks
-    .sort((a, b) => a.content.localeCompare(b.content))
-    .filter((task) => task.priority <= 3); // Only p3 and higher
+  const sortedAndNormalizedTasks = normalizedTasks.sort((a, b) =>
+    a.content.localeCompare(b.content)
+  );
 
   return sortedAndNormalizedTasks;
 }
@@ -222,6 +298,11 @@ function normalizeTasks(tasks: TodoistTaskRaw[]): TodoistTask[] {
     return { ...task, priority };
   });
   return normalizedTasks;
+}
+
+function extractNumber(content: string): number | null {
+  const match = content.match(/^\[(\d+)\]/);
+  return match ? parseInt(match[1], 10) : null;
 }
 
 export default OptionsCards;
