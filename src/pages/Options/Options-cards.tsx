@@ -162,6 +162,70 @@ const OptionsCards: React.FC = () => {
     }
   };
 
+  const handleReload = async () => {
+    setIsLoading(true);
+    try {
+      const updatedTasks = await getTasks({ filter: FILTER });
+      setTasks(updatedTasks);
+    } catch (error) {
+      alert('Failed to reload tasks');
+    } finally {
+      setIsLoading(false);
+      setQuestion('is_it_completed');
+    }
+  };
+
+  const handleDefer = async () => {
+    if (!nextTask) return;
+    const taskNum = extractNumber(nextTask.content);
+    if (taskNum === null) {
+      alert('Task does not have a time horizon number to defer from.');
+      return;
+    }
+
+    // Task will be moved to the end of its time horizon
+    let horizonEnd = 99;
+    for (const horizon of horizons) {
+      const horizonNum = extractNumber(horizon.content);
+      if (horizonNum !== null && horizonNum > taskNum) {
+        horizonEnd = horizonNum - 1;
+        break;
+      }
+    }
+
+    setIsLoading(true);
+    try {
+      const newTitle = nextTask.content.replace(
+        /^\[\d+\]/,
+        `[${horizonEnd.toString().padStart(2, '0')}]`
+      );
+      // If no [XX] prefix, add it
+      let finalTitle = /^\[\d+\]/.test(nextTask.content)
+        ? newTitle
+        : `[${horizonEnd.toString().padStart(2, '0')}] ${nextTask.content}`;
+
+      // Add additional 📍 between the number in square brackets and task title
+      finalTitle = finalTitle.replace(/^\[\d+\]\s?/, (match) => {
+        return match.trim() + ' ' + '📍';
+      });
+
+      await updateTaskTitle(nextTask.id, finalTitle);
+      const updatedTasks = await getTasks({ filter: FILTER });
+      setTasks(updatedTasks);
+    } catch (error) {
+      alert('Failed to update task title');
+    } finally {
+      setIsLoading(false);
+      handleNextQuestion();
+    }
+  };
+
+  // Count number of 📍 occurrences in task content
+  const countPins = (content: string) => {
+    return (content.match(/📍/g) || []).length;
+  };
+  const canBeDeferred = nextTask ? countPins(nextTask.content) < 3 : false;
+
   return (
     <div className="OptionsContainer">
       {isLoading && (
@@ -181,7 +245,9 @@ const OptionsCards: React.FC = () => {
           </div>
           <div className="task_list_buttons">
             <p className="task_list_buttons__question">{QUESTIONS[question]}</p>
-            <button onClick={handleNextQuestion}>no</button>
+            {question !== 'confirm_time_horizon' && (
+              <button onClick={handleNextQuestion}>no</button>
+            )}
             {question === 'is_it_completed' && (
               <button onClick={handleComplete}>✅ Yes, close it</button>
             )}
@@ -191,8 +257,11 @@ const OptionsCards: React.FC = () => {
             {question === 'should_delete' && (
               <button onClick={handleDelete}>🗑️ Delete it</button>
             )}
+            {question === 'break_it' && (
+              <button onClick={handleReload}>Yes</button>
+            )}
             {question === 'confirm_time_horizon' && (
-              <div className="time_horizons">
+              <>
                 {horizons.map((horizon, index) => (
                   <button
                     key={horizon.id}
@@ -201,8 +270,14 @@ const OptionsCards: React.FC = () => {
                     {horizon.content}
                   </button>
                 ))}
-              </div>
+              </>
             )}
+            {question === 'defer_it' &&
+              (canBeDeferred ? (
+                <button onClick={handleDefer}>Yes, defer it</button>
+              ) : (
+                'Cannot defer further'
+              ))}
           </div>
         </>
       )}
