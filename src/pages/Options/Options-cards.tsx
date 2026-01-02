@@ -56,6 +56,7 @@ const Task = ({ task }: { task: TodoistTask }) => {
 const OptionsCards: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [tasks, setTasks] = useState<TodoistTask[]>([]);
+  const [history, setHistory] = useState<string[]>([]);
 
   useEffect(() => {
     getTasks({ filter: FILTER }).then((tasks) => {
@@ -66,6 +67,28 @@ const OptionsCards: React.FC = () => {
 
   const relevantTasks = tasks.filter((task) => task.priority <= 3); // Only p3 and higher
   const nextTask = relevantTasks.length > 0 ? relevantTasks[0] : null;
+
+  const handleComplete = async () => {
+    if (!nextTask) return;
+    setIsLoading(true);
+    try {
+      await completeTask(nextTask.id);
+      const updatedTasks = await getTasks({ filter: FILTER });
+      setTasks(updatedTasks);
+      setHistory((prevHistory) => [
+        `Completed: ${nextTask.content}`,
+        ...prevHistory,
+      ]);
+    } catch (error) {
+      setHistory((prevHistory) => [
+        `Failed to complete: ${nextTask.content}`,
+        ...prevHistory,
+      ]);
+      alert('Failed to complete task');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
     <div className="OptionsContainer">
@@ -86,7 +109,7 @@ const OptionsCards: React.FC = () => {
           </div>
           <div className="task_list_buttons">
             <button>I'll take it</button>
-            <button>✅ Complete</button>
+            <button onClick={handleComplete}>✅ Complete</button>
             <button>🗑️ Delete</button>
             <button>🚠 Select time horizon</button>
             <button>⤵️ I'll break it</button>
@@ -95,9 +118,30 @@ const OptionsCards: React.FC = () => {
         </>
       )}
       {!isLoading && nextTask === null && <p>No tasks found.</p>}
+      {/* <ol className="task_list_history">
+        {history.map((entry, index) => (
+          <li key={index}>{entry}</li>
+        ))}
+      </ol> */}
     </div>
   );
 };
+
+async function completeTask(taskId: string): Promise<void> {
+  const response = await fetch(
+    `https://api.todoist.com/rest/v2/tasks/${taskId}/close`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${TODOIST_TOKEN}`,
+      },
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error('Failed to complete task');
+  }
+}
 
 async function getTasks({
   filter,
